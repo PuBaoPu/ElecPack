@@ -14,3 +14,5 @@ Depends:
 RoxygenNote: 7.1.2
 Imports: 
     tibble
+URL: https://github.com/PuBaoPu/ElecPack
+BugReports: https://github.com/PuBaoPu/ElecPack/issues
