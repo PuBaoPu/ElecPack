@@ -1,18 +1,61 @@
 ---
 title: "Template Title"
 author: "Your Name"
-date: "The Date"
-output: output_format
+date: "The Date,eg:2022/4/21"
+output: 
+  html_document:
+    toc: true
+    fig_caption: true
+    toc_depth: 4
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+---
 
-## Adding an RMarkdown Template
+# 1. 一级标题
+* 第一点:  
 
-This file is what a user will see when they select your template. Make sure that you update the fields in the yaml header. In particular you will want to update the `output` field to whatever format your template requires.
+## 1.1 二级标题
 
-This is a good place to demonstrate special features that your template provides. Ideally it should knit out-of-the-box, or at least contain clear instructions as to what needs changing.
+**小标题强调：**  
 
-Finally, be sure to remove this message!
+### 1.1.1 三级标题
+
+**小标题强调：**  
+
+```{r }
+# R Code
+
+```
+
+---
+
+# 2. 一级标题
+
+## 2.1 二级标题
+
+### 2.1.1 三级标题
+
+```{r }
+# R Code
+
+```
+
+#### 2.1.1.1 四级标题
+
+
+---
+
+# 3. 一级标题
+
+## 3.1 二级标题
+
+**小标题强调：**  
+
+### 3.1.1 三级标题
+
+
+---
+
