@@ -1,0 +1,197 @@
+---
+title: "Estimate and validate the elec output"
+author: "Pu"
+date: "2022/05/12"
+output: 
+  html_document:
+    toc: true
+    fig_caption: true
+    toc_depth: 4
+---
+
+
+---
+
+# 1. 使用自定义的R包数据
+
+## 1.1 导入必要包
+
+```{r }
+library(ElecPack)
+library(tidyr)
+library(dplyr)
+```
+
+## 1.2 导入包中数据
+
+
+```{r }
+## 列出当前已加载包中所含的所有可用示例数据集
+data(package = "ElecPack")
+## 加载世界银行和我的数据
+data(WB_data,package = "ElecPack")
+data(pop_2014_all,package = "ElecPack")
+```
+
+---
+
+# 2. 合并数据列
+
+## 2.1 新建合并数据表
+
+```{r }
+# 指定根据相同的列名匹配
+fulJoin_pop_2014 <- full_join(
+  pop_2014_all,WB_data,
+  by=c("country_name_clean.SOC"="Country.Code")) 
+#head(fulJoin_pop_2014)
+#tail(fulJoin_pop_2014)
+
+```
+
+## 2.2 导出合并数据表
+```{R }
+out_file <- "E://Out_Elec_Acc//Ex1_Globe_14_20//excel_elec_pop//fulJoin_pop_2014.csv"
+write.csv(fulJoin_pop_2014,out_file)
+```
+
+## 2.3 读取新的比较数据表-2014
+这里我已经整理了，列变量是两套数据的用电人口比例，但是还没有去除NA值和异常值。
+```{R }
+file_comp <- "E://Out_Elec_Acc//Ex1_Globe_14_20//excel_elec_pop//compare_2014.csv"
+to_comp_2014 <- data.frame(
+  read.csv(file=file_comp,
+           na.strings = c("#VALUE!","NA"),encoding = "UTF-8"))
+# 除去NA行
+# ①:subset function with multiple conditions
+# 这个只是提取出NA的行，不是我想要的。
+#subset(to_comp_2014,
+#       is.na(锘縞ountry_name_clean.FENAME)==TRUE)
+# ②：利用数据框的切片
+# 这个删除第一次，索引就不管用了
+#c<-to_comp_2014[!(
+#  is.na(to_comp_2014$country_name_clean.FCNAME)==TRUE |
+#    is.na(to_comp_2014$X2014..YR2014.)==TRUE) |
+#    is.na(to_comp_2014$ElecPopRate..)==TRUE,]
+
+# ③：drop_na()
+# 需要drop三次才管用
+mean(is.na(to_comp_2014$FCNAME))
+to_comp_clean1 <- to_comp_2014 %>%
+  drop_na(FCNAME)
+mean(is.na(to_comp_clean1$FCNAME))
+
+mean(is.na(to_comp_clean1$My_2014))
+to_comp_clean2 <- to_comp_clean1 %>%
+  drop_na(My_2014)
+mean(is.na(to_comp_clean2$My_2014))
+
+mean(is.na(to_comp_clean2$WB_2014))
+to_comp_clean3 <- to_comp_clean2 %>%
+  drop_na(WB_2014)
+mean(is.na(to_comp_clean3$WB_2014))
+
+# 清除异常值
+to_comp_clean4 <-to_comp_clean3[
+  !(to_comp_clean3$My_2014>100 ),]
+
+# 重命名表的列名-dplyr包
+# rename(dataFrame,NewName = OldName)
+#to_comp_clean4 <- to_comp_clean4 %>%
+#  rename(FENAMW = X.U.FEFF.FENAME)
+```
+![如何批量重命名列名](https://www.marsja.se/wp-content/uploads/2020/12/renaming_columns_in_R_dplyr.jpg "图片title")   
+---
+
+## 3 绘制相关图
+
+### 3.1 使用ggplot画图
+
+```{R}
+library(ggplot2)
+library(ggrepel)
+
+mydata <- to_comp_clean4
+fit <- lm(My_2014~WB_2014,data = mydata)  # 线性拟合
+# 查看拟合R方
+summary_2014 <- summary(fit)
+
+mydata$predicted <- predict(fit) #保存预测值
+mydata$residuals <- residuals(fit) #保存残差(有正有负)
+mydata$Abs_Residuals<-abs(mydata$residuals) #保存残差的绝对值
+# mydata 包含 x、y2、predicted、residuals、Abs_Residuals 共 5 列数值
+
+# 绘制
+ggplot(mydata, aes(x = My_2014, y = WB_2014)) +
+  # 使用实际值绘制气泡图，并将气泡的颜色和面积映射到残差的绝对值 Abs_Residuals
+  geom_point(aes(fill =Abs_Residuals, size = Abs_Residuals),shape=21,colour="black") +
+  # 使用人口数绘制气泡图，气泡颜色和面积为人口值
+    # 添加灰色的线性拟合曲线,se = FALSE表示不显示置信区间，level表示置信水平
+    geom_smooth(method = "lm", level = 0.8, color = "cornsilk4",size =0.5) + 
+         # 添加R方标注
+  annotate("text",x=85,y=25,label="atop(R^2==0.7239416,Y==0.7722 * X+11.2056)",fontface = "bold",parse=TRUE,size = 3,colour = "brown1")+
+            #填充颜色映射蓝到红色渐变系
+            scale_fill_continuous(low = "aquamarine", high = "coral") + 
+                 guides(fill = guide_legend((title="Residual")),size = guide_legend((title="Residual"))) +
+                   # 添加数据的国家标签
+                   geom_label_repel(data=mydata, aes(x=My_2014, y=WB_2014, label = SOC,fontface = "bold"),
+                   size=2,
+                   box.padding   = 0.05, 
+                   point.padding = 0.05,
+                   segment.color = 'grey50',
+                   max.overlaps = 2)+
+                     # 添加标题信息
+                     labs(title = "202 Countries Electrified Rate baesd on median_pop")+
+                       #修改坐标轴单位为百分比
+                        scale_y_continuous(labels = scales::percent_format(scale = 1))+
+                       scale_x_continuous(labels = scales::percent_format(scale = 1))
+```
+
+---
+
+# 4 分析比较
+## 4.1 差值排序
+```{R}
+# 创建、修改和删除列—— mutate()函数 {dplyr}
+mydata<- mutate(mydata,Elec_gap=My_2014-WB_2014)
+mydata<- mutate(mydata,Abs_Elecgap=abs(Elec_gap))#保存差的绝对值
+#mydata$Abs_Elecgap <- abs(mydata$Elec_gap) 
+barplot(Abs_Residuals,mydata,Abs_Elecgap,Abs_Residuals)
+
+# 排序
+gap_order <- mydata[order(mydata$Abs_Elecgap,decreasing = TRUE), ]
+head(gap_order)
+# 更简洁的分组
+#count(data, var1, var2)
+countT <- count(mydata,SOC, (Abs_Elecgap>20) == TRUE)
+
+# 画出差值大的国家
+ggplot(mydata, aes(x = My_2014, y = WB_2014)) +
+  geom_point(aes(fill =Elec_gap, size = Abs_Elecgap),shape=21,colour="black")+
+     scale_fill_continuous(low = "blue", high = "red") + 
+                 guides(fill = guide_legend((title="Elec_gap")),size = guide_legend((title="Elec_gap")))+
+                    geom_label_repel(data=mydata, aes(x=My_2014, y=WB_2014, label = SOC,fontface = "bold"),
+                   size=2,
+                   box.padding   = 0.05, 
+                   point.padding = 0.05,
+                   segment.color = 'grey50',
+                   max.overlaps = 2)
+```
+
+
+
+
+---
+
+* 参考教程：  
+[1] [R-有条件地删除特定行](https://www.programmingr.com/examples/remove-na-rows-in-r/ "删除特定行")  
+[2] [删除或删除 R 中具有条件的行](https://www.datasciencemadesimple.com/delete-or-drop-rows-in-r-with-conditions-2/ )  
+[3] [解决R Studio读取csv文件乱码](https://blog.csdn.net/weixin_40501747/article/details/80207295)  
+[4] [第 50 章 线性回归](https://bookdown.org/wangminjie/R4DS/tidystats-lm.html)  
+[5] [线性回归的显著性检验](http://www.r-tutor.com/elementary-statistics/simple-linear-regression/significance-test-linear-regression)  
+[6] [概述ggrepel:重叠的文本标签](https://ggrepel.slowkow.com/articles/examples.html)    
+[7] [如何重命名列](https://www.marsja.se/how-to-rename-column-or-columns-in-r-with-dplyr/)  
+[8] [按列操作](https://dplyr.tidyverse.org/articles/colwise.html)  
+[9] [ggplot2坐标轴的百分比转换](https://thomasadventure.blog/zh/posts/ggplot2-percentage-scale/)  
+[10] [R色彩名称](https://r-graph-gallery.com/42-colors-names.html)  
+[]
